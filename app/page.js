@@ -28,18 +28,42 @@ export default function HomePage() {
     });
 
     if (loginError) {
-      setError("Login gagal. Periksa kembali email & password Anda.");
+      // Menampilkan pesan asli dari Supabase supaya mudah tahu penyebabnya:
+      // - "Invalid login credentials" = email/password salah, ATAU user belum di-confirm
+      // - "Email not confirmed" = user belum klik konfirmasi / belum di-auto-confirm
+      setError(`Login gagal: ${loginError.message}`);
       setLoading(false);
       return;
     }
 
-    const { data: profile } = await supabase
+    if (!data?.user) {
+      setError("Login gagal: tidak ada data user yang dikembalikan.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", data.user.id)
-      .single();
+      .maybeSingle();
 
-    if (profile?.role === "admin") {
+    if (profileError) {
+      setError(`Login berhasil, tapi gagal ambil data profil: ${profileError.message}`);
+      setLoading(false);
+      return;
+    }
+
+    if (!profile) {
+      setError(
+        "Login berhasil, tapi belum ada data di tabel 'profiles' untuk user ini. Tambahkan row di Supabase Table Editor > profiles dengan id = " +
+          data.user.id
+      );
+      setLoading(false);
+      return;
+    }
+
+    if (profile.role === "admin") {
       router.push("/dashboard");
     } else {
       router.push("/fuelman");
